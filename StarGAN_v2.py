@@ -83,7 +83,7 @@ class StarGAN_v2():
         check_folder(self.result_dir)
 
 
-        dataset_path = './dataset'
+        dataset_path = '../datasets'
 
         self.dataset_path = os.path.join(dataset_path, self.dataset_name, 'train')
         self.test_dataset_path = os.path.join(dataset_path, self.dataset_name, 'test')
@@ -402,7 +402,7 @@ class StarGAN_v2():
 
         return "{}_{}_{}{}".format(self.model_name, self.dataset_name, self.gan_type, sn)
 
-    def refer_canvas(self, x_real, x_ref, y_trg, path, img_num):
+    def refer_canvas(self, x_real, x_ref, y_trg, path, img_path, img_num):
         if type(img_num) == list:
             # In test phase
             src_img_num = img_num[0]
@@ -415,6 +415,7 @@ class StarGAN_v2():
         x_ref = x_ref[:ref_img_num]
         y_trg = y_trg[:ref_img_num]
 
+        
         canvas = PIL.Image.new('RGB', (self.img_size * (src_img_num + 1) + 10, self.img_size * (ref_img_num + 1) + 10),
                                'white')
 
@@ -433,6 +434,11 @@ class StarGAN_v2():
 
             s_trg = self.style_encoder_ema([row_images, row_images_y])
             row_fake_images = postprocess_images(self.generator_ema([x_real, s_trg]))
+    
+            # Added lines of code: to save each image by itself.
+            for i in range(img_num[0]):
+                PIL.Image.fromarray(np.uint8(row_fake_images[i]), 'RGB').save(img_path +"_" +str(row) + "_src_"+ str(i) + ".jpg")
+                
 
             for col, image in enumerate(list(row_fake_images)):
                 canvas.paste(PIL.Image.fromarray(np.uint8(image), 'RGB'),
@@ -440,7 +446,7 @@ class StarGAN_v2():
 
         canvas.save(path)
 
-    def latent_canvas(self, x_real, path):
+    def latent_canvas(self, x_real, path, img_path):
         canvas = PIL.Image.new('RGB', (self.img_size * (self.num_domains + 1) + 10, self.img_size * self.num_style), 'white')
 
         x_real = tf.expand_dims(x_real[0], axis=0)
@@ -461,7 +467,13 @@ class StarGAN_v2():
                 x_fake = postprocess_images(x_fake)
 
                 col_image = x_fake[0]
-
+                
+                # Added lines of code: to save each image by itself.
+                state = "male" if col else "female"
+                PIL.Image.fromarray(np.uint8(col_image), 'RGB').save(img_path +"_" +str(row) + "_"+ state + ".jpg")
+                
+                
+                
                 canvas.paste(PIL.Image.fromarray(np.uint8(col_image), 'RGB'), ((col + 1) * self.img_size + 10, row * self.img_size))
 
         canvas.save(path)
@@ -520,10 +532,12 @@ class StarGAN_v2():
                         ref_img = tf.concat([ref_img, ref_img_], axis=0)
                         ref_img_domain = tf.concat([ref_img_domain, ref_img_domain_], axis=0)
 
+                print((ref_img.shape))
                 save_path = './{}/ref_all.jpg'.format(self.result_dir)
+                img_path = './{}/ref'.format(self.result_dir)
 
-                self.refer_canvas(src_img, ref_img, ref_img_domain, save_path,
-                                  img_num=[len(source_images), len(reference_images)])
+                self.refer_canvas(src_img, ref_img, ref_img_domain, save_path, img_path, img_num = [5, 15])
+                                  #img_num=[len(source_images), len(reference_images)])
 
             else:
                 # [merge_size : merge_size] matching
@@ -604,5 +618,6 @@ class StarGAN_v2():
             src_img = tf.expand_dims(src_img, axis=0)
 
             save_path = './{}/latent_{}{}'.format(self.result_dir, src_name, src_extension)
+            save_img_path = './{}/{}'.format(self.result_dir, src_name)
 
-            self.latent_canvas(src_img, save_path)
+            self.latent_canvas(src_img, save_path, save_img_path)
